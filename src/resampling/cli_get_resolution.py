@@ -3,7 +3,6 @@ import glob
 import click
 import logging
 from pathlib import Path
-from dotenv import find_dotenv, load_dotenv
 import pandas as pd
 import SimpleITK as sitk
 
@@ -11,12 +10,13 @@ import SimpleITK as sitk
 @click.command()
 @click.argument('input_folder',
                 type=click.Path(exists=True),
-                default='data/processed')
+                default='data/hecktor_nii')
 @click.argument('output_file',
                 type=click.Path(),
-                default='data/original_resolution_ct.csv')
+                default='data/original_resolution_pt.csv')
 @click.option('--extension', type=click.STRING, default='.nii.gz')
-def main(input_folder, output_file, extension):
+@click.option('--regex', type=click.STRING, default='ct')
+def main(input_folder, output_file, extension, regex):
     """Command Line Inteface used to generate a csv file containing the
        original voxel spacing.
 
@@ -28,16 +28,23 @@ def main(input_folder, output_file, extension):
     """
 
     resolution_dict = pd.DataFrame()
-    for f in glob.glob(input_folder + '/**/*_ct' + extension, recursive=True):
+    for f in glob.glob(input_folder + f'/**/*_{regex}' + extension, recursive=True):
         patient_name = f.split('/')[-2]
+        modality = f.split('/')[-1].split("_")[-1].split(".")[0]
+
         sitk_image = sitk.ReadImage(f)
         px_spacing = sitk_image.GetSpacing()
+
+
         resolution_dict = resolution_dict.append(
             {
                 'PatientID': patient_name,
+                'Modality': modality.upper(),
                 'Resolution_x': px_spacing[0],
                 'Resolution_y': px_spacing[1],
-                'Resolution_z': px_spacing[2]
+                'Resolution_z': px_spacing[2],
+                'Image_Size': sitk_image.GetSize()
+                
             },
             ignore_index=True)
 
@@ -54,6 +61,5 @@ if __name__ == '__main__':
 
     # find .env automagically by walking up directories until it's found, then
     # load up the .env entries as environment variables
-    load_dotenv(find_dotenv())
 
     main()
